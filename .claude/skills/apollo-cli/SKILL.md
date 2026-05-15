@@ -1,12 +1,12 @@
 ---
 name: apollo-cli
-description: This skill should be used when searching for people, companies, employees, job postings, or news, OR when driving CRM data (contacts, accounts, deals), sequences, phone calls, tasks, analytics, or credit usage in Apollo.io from the terminal. Activates when the user asks to "find people", "search companies", "enrich a contact", "look up employees", "find jobs at a company", "get company news", "create a contact / account / deal", "log a call", "create a task", "add to sequence", "check analytics", "view credit usage", or any task involving Apollo.io data lookup or CRM writes from the terminal.
-version: 2.0.0
+description: This skill should be used when searching for people, companies, employees, job postings, or news, OR when driving CRM data (contacts, accounts, deals, labels, custom fields), sequences, phone calls, tasks, analytics, or credit usage in Apollo.io from the terminal. Activates when the user asks to "find people", "search companies", "enrich a contact", "look up employees", "find jobs at a company", "get company news", "create a contact / account / deal", "list labels / lists", "inspect custom fields", "log a call", "create a task", "add to sequence", "check analytics", "view credit usage", or any task involving Apollo.io data lookup or CRM writes from the terminal.
+version: 2.1.0
 ---
 
 # Apollo CLI Skill
 
-Use the `apollo` CLI to drive Apollo.io end to end: search/enrich people and companies, surface news and job postings, manage CRM contacts/accounts/deals, drive sequences, log phone calls and tasks, pull analytics, and inspect credit usage. Output defaults to JSON for `jq` piping; use `-f, --format` to switch to `jsonl`, `csv`, `yaml`, or `table`.
+Use the `apollo` CLI to drive Apollo.io end to end: search/enrich people and companies, surface news and job postings, manage CRM contacts/accounts/deals, inspect labels and custom-field schema, drive sequences, log phone calls and tasks, pull analytics, and inspect credit usage. Output defaults to JSON for `jq` piping; use `-f, --format` to switch to `jsonl`, `csv`, `yaml`, or `table`.
 
 ## Authentication
 
@@ -16,11 +16,30 @@ Before running any command, confirm the user is authenticated:
 apollo auth whoami
 ```
 
-If not logged in, run:
+The CLI supports two methods. Most commands work with either; `apollo labels` and `apollo custom-fields` require an API key (Apollo gates those endpoints from OAuth tokens).
+
+**OAuth (browser flow)** — recommended for interactive use:
 
 ```bash
 apollo auth login
 ```
+
+**API key** — required for the gated endpoints. Generate in Apollo Settings → Integrations → API:
+
+```bash
+apollo auth api-login                                          # interactive no-echo prompt
+echo "$APOLLO_API_KEY" | apollo auth api-login --from-stdin    # CI / scripts
+```
+
+The key is verified before being saved to `~/.config/apollo/credentials` (mode `600`); an invalid key never touches disk.
+
+**Precedence** when multiple sources are present:
+
+1. `APOLLO_API_KEY` env var (always wins)
+2. API key in credentials file
+3. OAuth token in credentials file
+
+`apollo auth logout` clears either credential type.
 
 ## Commands
 
@@ -149,6 +168,35 @@ apollo accounts create --name "Acme Co" --domain acme.com
 apollo accounts update --id <account_id> --phone 555-303-1234
 apollo accounts bulk-create --file ./accounts.json
 ```
+
+---
+
+### Labels (lists for contacts and accounts)
+
+Requires API-key auth.
+
+```bash
+apollo labels list                                # all labels in the team
+apollo labels list --modality contacts            # filter client-side
+apollo labels list --modality accounts -f table
+apollo labels show --id <label_id>
+```
+
+Each label carries `_id` (also exposed as `id`), `name`, `modality` (`contacts` or `accounts`), and `cached_count` (number of records currently in the list). Useful for resolving the `--label` names accepted by `apollo contacts create` and `apollo sequences add-contacts`.
+
+---
+
+### Custom fields (typed schema for accounts / contacts / opportunities)
+
+Requires API-key auth. Read-only inspection of the team's custom field definitions.
+
+```bash
+apollo custom-fields list                         # all fields
+apollo custom-fields list --modality account      # filter client-side
+apollo custom-fields show --id <field_id>
+```
+
+Each field carries `id`, `name`, `modality` (`account`, `contact`, or `opportunity`), `type` (`textarea`, `picklist`, `boolean`, …), `text_field_max_length`, and — for AI-prompt fields — `is_ai_field: true` plus `dynamic_field_type`. Use this to discover field IDs before reading their values from contact/account responses (where they appear under `typed_custom_fields`).
 
 ---
 
@@ -314,6 +362,10 @@ apollo companies search --industry SaaS --funding "5000000,20000000" --location 
 | `contacts bulk-create` | `.created_contacts[]` |
 | `accounts create` / `accounts update` | `.account` |
 | `accounts bulk-create` | `.created_accounts[]` |
+| `labels list` | top-level array (no envelope) |
+| `labels show` | label object |
+| `custom-fields list` | `.typed_custom_fields[]` |
+| `custom-fields show` | top-level field object |
 | `deals create` / `deals show` | `.opportunity` |
 | `deals search` | `.opportunities[]` |
 | `sequences search` | `.emailer_campaigns[]` (+ `.pagination`) |

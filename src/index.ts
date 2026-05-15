@@ -16,6 +16,8 @@ import { registerUsers } from './commands/users.js';
 import { registerEmailAccounts } from './commands/emailAccounts.js';
 import { registerUsage } from './commands/usage.js';
 import { registerAnalytics } from './commands/analytics.js';
+import { registerLabels } from './commands/labels.js';
+import { registerCustomFields } from './commands/customFields.js';
 
 const program = new Command();
 
@@ -30,8 +32,10 @@ registerAuth(program);
 registerCalls(program);
 registerCompanies(program);
 registerContacts(program);
+registerCustomFields(program);
 registerDeals(program);
 registerEmailAccounts(program);
+registerLabels(program);
 registerNews(program);
 registerPeople(program);
 registerSequences(program);

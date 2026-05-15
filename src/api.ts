@@ -13,10 +13,17 @@ function resolvePath(path: string): string {
 }
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
+  const envKey = process.env.APOLLO_API_KEY;
+  if (envKey) {
+    return { 'X-Api-Key': envKey };
+  }
   const creds = await getValidCredentials();
   if (!creds) {
-    console.error('Not logged in. Run: apollo auth login');
+    console.error('Not logged in. Run: apollo auth login or apollo auth api-login');
     process.exit(1);
+  }
+  if (creds.type === 'api_key') {
+    return { 'X-Api-Key': creds.api_key };
   }
   if (creds.expires_at !== null && Date.now() >= creds.expires_at) {
     console.error('Session expired. Run: apollo auth login');
@@ -53,6 +60,26 @@ export async function apolloGet<T = ApolloJson>(path: string, params: QueryParam
     process.exit(1);
   }
   return await res.json() as T;
+}
+
+// Lower-level GET that does NOT exit on non-2xx; lets callers verify ad-hoc
+// credentials (e.g. an API key being validated by `auth api-login`) without
+// touching getValidCredentials() or the saved credentials file.
+export async function apolloGetWithHeaders<T = ApolloJson>(
+  path: string,
+  authHeaders: Record<string, string>,
+): Promise<{ ok: boolean; status: number; data: T | null }> {
+  const res = await fetch(resolvePath(path), {
+    method: 'GET',
+    headers: {
+      'Cache-Control': 'no-cache',
+      'User-Agent': `apollo-io-cli/${pkg.version}`,
+      'X-Apollo-Source': 'apollo-cli',
+      ...authHeaders,
+    },
+  });
+  const data = res.ok ? (await res.json()) as T : null;
+  return { ok: res.ok, status: res.status, data };
 }
 
 export async function apolloRequest<T = ApolloJson>(

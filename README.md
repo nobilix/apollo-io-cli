@@ -56,13 +56,40 @@ npm link        # makes `apollo` available globally
 
 ## Authentication
 
-Authentication uses OAuth 2.0 via your browser — no API key needed.
+The CLI supports two methods. Pick whichever matches the endpoints you need.
+
+### OAuth (browser flow)
+
+Recommended for interactive use.
 
 ```bash
 apollo auth login    # opens browser to authorize, saves token to ~/.config/apollo/credentials
 apollo auth whoami   # confirm you're logged in
 apollo auth logout   # revoke token and remove saved credentials
 ```
+
+### API key
+
+Required for endpoints Apollo gates from OAuth tokens (e.g. `apollo labels`,
+`apollo custom-fields`). Generate a key in Apollo Settings → Integrations
+→ API and grant only the scopes you need.
+
+```bash
+apollo auth api-login   # interactive no-echo prompt
+echo "$APOLLO_API_KEY" | apollo auth api-login --from-stdin   # CI / scripts
+```
+
+The key is verified against `/users/api_profile` before being saved to
+`~/.config/apollo/credentials` (mode `600`). `apollo auth logout` removes
+either credential type.
+
+### Precedence
+
+When multiple sources are present, the CLI uses them in this order:
+
+1. `APOLLO_API_KEY` environment variable (always wins, useful for CI)
+2. API key in `~/.config/apollo/credentials`
+3. OAuth token in `~/.config/apollo/credentials`
 
 ## Commands
 
@@ -392,13 +419,49 @@ A minimal `report.json`:
 
 ---
 
+### `apollo labels`
+
+Inspect labels (a.k.a. lists) for contacts and accounts. Requires API-key auth — Apollo gates these endpoints from OAuth tokens.
+
+```bash
+apollo labels list
+apollo labels list --modality contacts
+apollo labels list --modality accounts --format table
+apollo labels show --id <label-id>
+```
+
+| Option | Description |
+|---|---|
+| `--modality` | Filter client-side: `contacts` or `accounts` |
+| `-f, --format` | Output format: `json`, `jsonl`, `csv`, `yaml`, `table` (default `json`) |
+
+---
+
+### `apollo custom-fields`
+
+Inspect typed custom field schema for accounts, contacts, and opportunities. Requires API-key auth.
+
+```bash
+apollo custom-fields list
+apollo custom-fields list --modality account
+apollo custom-fields show --id <field-id>
+```
+
+| Option | Description |
+|---|---|
+| `--modality` | Filter client-side: `account`, `contact`, or `opportunity` |
+| `-f, --format` | Output format: `json`, `jsonl`, `csv`, `yaml`, `table` (default `json`) |
+
+---
+
 ### `apollo auth`
 
 | Command | Description |
 |---|---|
 | `apollo auth login` | Authorize via browser OAuth, saves token to `~/.config/apollo/credentials` |
-| `apollo auth logout` | Revoke token and remove saved credentials |
-| `apollo auth whoami` | Show whether you're logged in |
+| `apollo auth api-login` | Save an Apollo API key. Interactive no-echo prompt; pass `--from-stdin` to pipe |
+| `apollo auth logout` | Revoke OAuth token (if any) and remove saved credentials |
+| `apollo auth whoami` | Show the authenticated user and which method is active |
 
 ---
 

@@ -43,13 +43,18 @@ export function saveOAuthCredentials({ clientId, access_token, refresh_token, ex
 function isCredentials(value: unknown): value is Credentials {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
-  return (
-    v.type === 'oauth' &&
-    typeof v.access_token === 'string' &&
-    typeof v.refresh_token === 'string' &&
-    typeof v.client_id === 'string' &&
-    (v.expires_at === null || typeof v.expires_at === 'number')
-  );
+  if (v.type === 'oauth') {
+    return (
+      typeof v.access_token === 'string' &&
+      typeof v.refresh_token === 'string' &&
+      typeof v.client_id === 'string' &&
+      (v.expires_at === null || typeof v.expires_at === 'number')
+    );
+  }
+  if (v.type === 'api_key') {
+    return typeof v.api_key === 'string' && v.api_key.length > 0;
+  }
+  return false;
 }
 
 export function loadCredentials(): Credentials | null {
@@ -58,9 +63,16 @@ export function loadCredentials(): Credentials | null {
   return isCredentials(parsed) ? parsed : null;
 }
 
+export function saveApiKeyCredentials(apiKey: string): void {
+  mkdirSync(dirname(CREDENTIALS_PATH), { recursive: true, mode: 0o700 });
+  const payload: Credentials = { type: 'api_key', api_key: apiKey };
+  writeFileSync(CREDENTIALS_PATH, JSON.stringify(payload), { mode: 0o600 });
+}
+
 export async function getValidCredentials(): Promise<Credentials | null> {
   const creds = loadCredentials();
   if (!creds) return null;
+  if (creds.type === 'api_key') return creds;
 
   const isExpired = creds.expires_at !== null && Date.now() >= creds.expires_at - TOKEN_EXPIRY_BUFFER_MS;
   if (!isExpired) return creds;

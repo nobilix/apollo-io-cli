@@ -1,10 +1,17 @@
-export interface Credentials {
+export interface OAuthCredentials {
   type: 'oauth';
   access_token: string;
   refresh_token: string;
   client_id: string;
   expires_at: number | null;
 }
+
+export interface ApiKeyCredentials {
+  type: 'api_key';
+  api_key: string;
+}
+
+export type Credentials = OAuthCredentials | ApiKeyCredentials;
 
 export interface OAuthTokenResponse {
   access_token: string;
